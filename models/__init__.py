@@ -1,5 +1,9 @@
 #!/usr/bin/python3
-"""create a unique FileStorage instance for your application"""
+"""
+__init__ method for models package, or
+Module for FileStorage autoinit.
+"""
+
 from models.engine.file_storage import FileStorage
 
 """A variable storage, an instance of FileStorage"""
