@@ -1,91 +1,59 @@
 #!/usr/bin/python3
-""" Module of Unittests """
-import unittest
-from models.base_model import BaseModel
-from models.engine.file_storage import FileStorage
-from models import storage
-import os
-import json
+"""Defines all common attributes/methods for other classes
+"""
+import uuid
+from datetime import datetime
+import models
 
 
-class FileStorageTests(unittest.TestCase):
-    """ Suite of File Storage Tests """
+class BaseModel:
+    """Base class for all models"""
 
-    my_model = BaseModel()
+    def __init__(self, *args, **kwargs):
+        """Initialization of a Base instance.
+        Args:
+            - *args: list of arguments
+            - **kwargs: dict of key-values arguments
+        """
+        if kwargs:
+            dtime_format = '%Y-%m-%dT%H:%M:%S.%f'
+            for key, value in kwargs.items():
+                if key == '__class__':
+                    continue
+                elif key == 'created_at':
+                    self.created_at = datetime.strptime(
+                        kwargs['created_at'], dtime_format)
+                elif key == 'updated_at':
+                    self.updated_at = datetime.strptime(
+                        kwargs['updated_at'], dtime_format)
+                else:
+                    setattr(self, key, value)
+        else:
+            self.id = str(uuid.uuid4())
+            self.created_at = datetime.now()
+            self.updated_at = datetime.now()
+            models.storage.new(self)  # as instructed also in task 5
 
-    def testClassInstance(self):
-        """ Check instance """
-        self.assertIsInstance(storage, FileStorage)
+    def __str__(self):
+        """Returns a readable string representation
+        of BaseModel instances"""
 
-    def testStoreBaseModel(self):
-        """ Test save and reload functions """
-        self.my_model.full_name = "BaseModel Instance"
-        self.my_model.save()
-        bm_dict = self.my_model.to_dict()
-        all_objs = storage.all()
+        clsName = self.__class__.__name__
+        return "[{}] ({}) {}".format(clsName, self.id, self.__dict__)
 
-        key = bm_dict['__class__'] + "." + bm_dict['id']
-        self.assertEqual(key in all_objs, True)
+    def save(self):
+        """Updates the public instance attribute updated_at
+        with the current datetime"""
 
-    def testStoreBaseModel2(self):
-        """ Test save, reload and update functions """
-        self.my_model.my_name = "First name"
-        self.my_model.save()
-        bm_dict = self.my_model.to_dict()
-        all_objs = storage.all()
+        self.updated_at = datetime.now()
+        models.storage.save()
 
-        key = bm_dict['__class__'] + "." + bm_dict['id']
+    def to_dict(self):
+        """Returns a dictionary that contains all
+        keys/values of the instance"""
+        my_dict = self.__dict__.copy()
+        my_dict['updated_at'] = self.updated_at.isoformat()
+        my_dict['created_at'] = self.created_at.isoformat()
+        my_dict['__class__'] = self.__class__.__name__
 
-        self.assertEqual(key in all_objs, True)
-        self.assertEqual(bm_dict['my_name'], "First name")
-
-        create1 = bm_dict['created_at']
-        update1 = bm_dict['updated_at']
-
-        self.my_model.my_name = "Second name"
-        self.my_model.save()
-        bm_dict = self.my_model.to_dict()
-        all_objs = storage.all()
-
-        self.assertEqual(key in all_objs, True)
-
-        create2 = bm_dict['created_at']
-        update2 = bm_dict['updated_at']
-
-        self.assertEqual(create1, create2)
-        self.assertNotEqual(update1, update2)
-        self.assertEqual(bm_dict['my_name'], "Second name")
-
-    def testHasAttributes(self):
-        """verify if attributes exist"""
-        self.assertEqual(hasattr(FileStorage, '_FileStorage__file_path'), True)
-        self.assertEqual(hasattr(FileStorage, '_FileStorage__objects'), True)
-
-    def testsave(self):
-        """verify if JSON exists"""
-        self.my_model.save()
-        self.assertEqual(os.path.exists(storage._FileStorage__file_path), True)
-        self.assertEqual(storage.all(), storage._FileStorage__objects)
-
-    def testreload(self):
-        """test if reload """
-        self.my_model.save()
-        self.assertEqual(os.path.exists(storage._FileStorage__file_path), True)
-        dobj = storage.all()
-        FileStorage._FileStorage__objects = {}
-        self.assertNotEqual(dobj, FileStorage._FileStorage__objects)
-        storage.reload()
-        for key, value in storage.all().items():
-            self.assertEqual(dobj[key].to_dict(), value.to_dict())
-
-    def testSaveSelf(self):
-        """ Check save self """
-        msg = "save() takes 1 positional argument but 2 were given"
-        with self.assertRaises(TypeError) as e:
-            FileStorage.save(self, 100)
-
-        self.assertEqual(str(e.exception), msg)
-
-
-if __name__ == '__main__':
-    unittest.main()
+        return my_dict
