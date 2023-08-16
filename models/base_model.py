@@ -1,62 +1,91 @@
 #!/usr/bin/python3
-"""Defines all common attributes/methods for other classes"""
+""" Module of Unittests """
+import unittest
+from models.base_model import BaseModel
+from models.engine.file_storage import FileStorage
+from models import storage
+import os
+import json
 
-import uuid
-from datetime import datetime
-import models
+
+class FileStorageTests(unittest.TestCase):
+    """ Suite of File Storage Tests """
+
+    my_model = BaseModel()
+
+    def testClassInstance(self):
+        """ Check instance """
+        self.assertIsInstance(storage, FileStorage)
+
+    def testStoreBaseModel(self):
+        """ Test save and reload functions """
+        self.my_model.full_name = "BaseModel Instance"
+        self.my_model.save()
+        bm_dict = self.my_model.to_dict()
+        all_objs = storage.all()
+
+        key = bm_dict['__class__'] + "." + bm_dict['id']
+        self.assertEqual(key in all_objs, True)
+
+    def testStoreBaseModel2(self):
+        """ Test save, reload and update functions """
+        self.my_model.my_name = "First name"
+        self.my_model.save()
+        bm_dict = self.my_model.to_dict()
+        all_objs = storage.all()
+
+        key = bm_dict['__class__'] + "." + bm_dict['id']
+
+        self.assertEqual(key in all_objs, True)
+        self.assertEqual(bm_dict['my_name'], "First name")
+
+        create1 = bm_dict['created_at']
+        update1 = bm_dict['updated_at']
+
+        self.my_model.my_name = "Second name"
+        self.my_model.save()
+        bm_dict = self.my_model.to_dict()
+        all_objs = storage.all()
+
+        self.assertEqual(key in all_objs, True)
+
+        create2 = bm_dict['created_at']
+        update2 = bm_dict['updated_at']
+
+        self.assertEqual(create1, create2)
+        self.assertNotEqual(update1, update2)
+        self.assertEqual(bm_dict['my_name'], "Second name")
+
+    def testHasAttributes(self):
+        """verify if attributes exist"""
+        self.assertEqual(hasattr(FileStorage, '_FileStorage__file_path'), True)
+        self.assertEqual(hasattr(FileStorage, '_FileStorage__objects'), True)
+
+    def testsave(self):
+        """verify if JSON exists"""
+        self.my_model.save()
+        self.assertEqual(os.path.exists(storage._FileStorage__file_path), True)
+        self.assertEqual(storage.all(), storage._FileStorage__objects)
+
+    def testreload(self):
+        """test if reload """
+        self.my_model.save()
+        self.assertEqual(os.path.exists(storage._FileStorage__file_path), True)
+        dobj = storage.all()
+        FileStorage._FileStorage__objects = {}
+        self.assertNotEqual(dobj, FileStorage._FileStorage__objects)
+        storage.reload()
+        for key, value in storage.all().items():
+            self.assertEqual(dobj[key].to_dict(), value.to_dict())
+
+    def testSaveSelf(self):
+        """ Check save self """
+        msg = "save() takes 1 positional argument but 2 were given"
+        with self.assertRaises(TypeError) as e:
+            FileStorage.save(self, 100)
+
+        self.assertEqual(str(e.exception), msg)
 
 
-class BaseModel():
-    """Base class for all models"""
-
-    def __init__(self, *args, **kwargs):
-        """class constructor for class BaseModel: Initialization of a Base instance.
-        
-        Args: 
-            - *args: list of arguments
-            - **kwargs: dict of key-values arguments
-        """
-        if kwargs:
-
-            kwargs['created_at'] = datetime.strptime(kwargs['created_at'],
-                    '%Y-%m-%dT%H:%M:%S.%f')
-            kwargs['updated_at'] = datetime.strptime(kwargs['updated_at'],
-                    '%Y-%m-%dT%H:%M:%S.%f')
-
-            for key, value in kwargs.items():
-                if key != '__class__':
-                    setattr(self, key, value)
-
-        else:
-            self.id = str(uuid.uuid4())
-            self.created_at = datetime.now()
-            self.updated_at = datetime.now()
-            models.storage.new(self)
-
-    def __str__(self):
-        """
-        string of BaseModel instance:
-            Returns a readable string representation of BaseModel instances
-        """
-
-        return "[{}] ({}) {}".format(self.__class__.__name__,
-                self.id, self.__dict__)
-
-    def save(self):
-        """
-        Updates the public instance attribute updated_at
-        with the current datetime
-        """
-        self.updated_at = datetime.now()
-        models.storage.save()
-
-    def to_dict(self):
-        """
-        Returns a dictionary that contains all
-        keys/values of the instance
-        """
-        new_dict = dict(self.__dict__)
-        new_dict['created_at'] = self.__dict__['created_at'].isoformat()
-        new_dict['updated_at'] = self.__dict__['updated_at'].isoformat()
-        new_dict['__class__'] = self.__class__.__name__
-        return (new_dict)
+if __name__ == '__main__':
+    unittest.main()
